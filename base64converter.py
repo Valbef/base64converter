@@ -933,7 +933,7 @@ def mostrar_menu():
 
     print(f"{CYAN}{BOLD}")
     print("==============================================")
-    print("                BASE64 TOOL")
+    print("                BASE64CONVERTER")
     print("==============================================")
     print(RESET)
 
