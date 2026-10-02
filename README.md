@@ -47,7 +47,9 @@ El programa utiliza únicamente módulos incluidos en la biblioteca estándar de
 
 
 ==========================
+
 Instalación:
+
 ==========================
 
 Windows
