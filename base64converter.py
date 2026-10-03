@@ -3,6 +3,7 @@
 import base64
 import binascii
 import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -20,7 +21,7 @@ CHUNK_SIZE = 1024 * 1024
 # COLORES
 # ============================================================
 
-# Intentamos utilizar colores ANSI.
+# Colores ANSI.
 # Funcionan en Linux, Termux y versiones modernas de Windows.
 
 RESET = "\033[0m"
@@ -31,37 +32,68 @@ YELLOW = "\033[93m"
 RED = "\033[91m"
 BLUE = "\033[94m"
 GRAY = "\033[90m"
+WHITE = "\033[97m"
 
+
+# ============================================================
+# UTILIDADES GENERALES
+# ============================================================
 
 def limpiar_pantalla():
     """Limpia la terminal."""
 
-    os.system("cls" if os.name == "nt" else "clear")
+    if os.name == "nt":
+        subprocess.run(
+            ["cmd", "/c", "cls"],
+            check=False
+        )
+    else:
+        subprocess.run(
+            ["clear"],
+            check=False
+        )
 
 
 def pausa():
     """Espera a que el usuario pulse ENTER."""
 
-    input(f"\n{GRAY}Pulsa ENTER para continuar...{RESET}")
+    input(
+        f"\n{GRAY}Pulsa ENTER para continuar...{RESET}"
+    )
 
 
 # ============================================================
 # UTILIDADES
 # ============================================================
 
-def pedir_ruta_archivo(mensaje):
+def pedir_ruta_archivo(mensaje: str) -> Path | None:
     """
     Solicita una ruta de archivo al usuario.
 
     Se aceptan rutas con o sin comillas.
+
+    Introducir 0 permite volver al menú principal.
     """
 
     while True:
 
-        ruta = input(mensaje).strip()
+        ruta = input(
+            f"{mensaje}\n"
+            f"{GRAY}(Introduce 0 para volver al menú){RESET}\n"
+            f"> "
+        ).strip()
 
-        # Permitir que el usuario pegue:
-        # "C:\Users\Usuario\archivo.pdf"
+        # ----------------------------------------------------
+        # VOLVER AL MENÚ
+        # ----------------------------------------------------
+
+        if ruta == "0":
+            return None
+
+        # ----------------------------------------------------
+        # QUITAR COMILLAS DOBLES
+        # ----------------------------------------------------
+
         if (
             len(ruta) >= 2
             and ruta[0] == '"'
@@ -69,7 +101,10 @@ def pedir_ruta_archivo(mensaje):
         ):
             ruta = ruta[1:-1]
 
-        # También aceptamos comillas simples.
+        # ----------------------------------------------------
+        # QUITAR COMILLAS SIMPLES
+        # ----------------------------------------------------
+
         if (
             len(ruta) >= 2
             and ruta[0] == "'"
@@ -77,11 +112,21 @@ def pedir_ruta_archivo(mensaje):
         ):
             ruta = ruta[1:-1]
 
+        # ----------------------------------------------------
+        # COMPROBAR VACÍO
+        # ----------------------------------------------------
+
         if not ruta:
-            print(f"{RED}No has introducido ninguna ruta.{RESET}")
+            print(
+                f"{RED}No has introducido ninguna ruta.{RESET}"
+            )
             continue
 
         ruta = Path(ruta).expanduser()
+
+        # ----------------------------------------------------
+        # COMPROBAR EXISTENCIA
+        # ----------------------------------------------------
 
         if not ruta.exists():
             print(
@@ -90,53 +135,89 @@ def pedir_ruta_archivo(mensaje):
             )
             continue
 
+        # ----------------------------------------------------
+        # COMPROBAR QUE SEA ARCHIVO
+        # ----------------------------------------------------
+
         if not ruta.is_file():
             print(
-                f"{RED}La ruta indicada no corresponde a un archivo.{RESET}"
+                f"{RED}La ruta indicada no corresponde "
+                f"a un archivo.{RESET}"
             )
             continue
 
         return ruta
 
 
-def pedir_si_no(mensaje):
-    """Pregunta algo cuya respuesta debe ser sí o no."""
+def pedir_si_no(mensaje: str) -> bool | None:
+    """
+    Pregunta algo cuya respuesta debe ser sí, no o 0.
+
+    Devuelve:
+        True  -> sí
+        False -> no
+        None  -> volver al menú
+    """
 
     while True:
 
         respuesta = input(
-            f"{mensaje} {GRAY}[s/n]{RESET}: "
+            f"{mensaje}\n"
+            f"{GRAY}[s/n] — 0 para volver al menú{RESET}: "
         ).strip().lower()
 
-        if respuesta in ("s", "si", "sí", "y", "yes"):
+        if respuesta == "0":
+            return None
+
+        if respuesta in (
+            "s",
+            "si",
+            "sí",
+            "y",
+            "yes"
+        ):
             return True
 
-        if respuesta in ("n", "no"):
+        if respuesta in (
+            "n",
+            "no"
+        ):
             return False
 
         print(
-            f"{YELLOW}Introduce 's' para sí o 'n' para no.{RESET}"
+            f"{YELLOW}"
+            f"Introduce 's' para sí, 'n' para no "
+            f"o '0' para volver al menú."
+            f"{RESET}"
         )
 
 
-def pedir_nombre_txt():
+def pedir_nombre_txt() -> str | None:
     """
     Pide el nombre que tendrá el archivo Base64.
 
-    El usuario puede escribir:
-        archivo
-        archivo.txt
-
-    Siempre terminaremos con .txt
+    Introducir 0 permite volver al menú principal.
     """
 
     while True:
 
         nombre = input(
-            "Introduce el nombre del archivo Base64: "
+            f"Introduce el nombre del archivo Base64:\n"
+            f"{GRAY}(Introduce 0 para volver al menú){RESET}\n"
+            f"> "
         ).strip()
 
-        # Quitar comillas si el usuario las pega.
+        # ----------------------------------------------------
+        # VOLVER AL MENÚ
+        # ----------------------------------------------------
+
+        if nombre == "0":
+            return None
+
+        # ----------------------------------------------------
+        # QUITAR COMILLAS
+        # ----------------------------------------------------
+
         if (
             len(nombre) >= 2
             and nombre[0] == '"'
@@ -144,19 +225,32 @@ def pedir_nombre_txt():
         ):
             nombre = nombre[1:-1]
 
+        # ----------------------------------------------------
+        # COMPROBAR VACÍO
+        # ----------------------------------------------------
+
         if not nombre:
             print(
                 f"{RED}El nombre no puede estar vacío.{RESET}"
             )
             continue
 
-        # Evitar rutas.
+        # ----------------------------------------------------
+        # EVITAR RUTAS
+        # ----------------------------------------------------
+
         if "/" in nombre or "\\" in nombre:
             print(
-                f"{RED}Introduce solamente el nombre del archivo, "
-                f"no una ruta.{RESET}"
+                f"{RED}"
+                f"Introduce solamente el nombre del archivo, "
+                f"no una ruta."
+                f"{RESET}"
             )
             continue
+
+        # ----------------------------------------------------
+        # AÑADIR .TXT
+        # ----------------------------------------------------
 
         if not nombre.lower().endswith(".txt"):
             nombre += ".txt"
@@ -164,36 +258,63 @@ def pedir_nombre_txt():
         return nombre
 
 
-def pedir_nombre_archivo(extension):
+def pedir_nombre_archivo(
+    extension: str
+) -> str | None:
     """
     Pide el nombre del archivo que se va a reconstruir.
 
-    Ejemplo:
-        extensión: pdf
-        nombre: documento
-
-    Resultado:
-        documento.pdf
+    Introducir 0 permite volver al menú principal.
     """
 
     extension = extension.strip()
 
+    # --------------------------------------------------------
+    # COMPROBAR EXTENSIÓN
+    # --------------------------------------------------------
+
     if not extension:
-        raise ValueError("La extensión no puede estar vacía.")
+        raise ValueError(
+            "La extensión no puede estar vacía."
+        )
+
+    # --------------------------------------------------------
+    # AÑADIR PUNTO
+    # --------------------------------------------------------
 
     if not extension.startswith("."):
         extension = "." + extension
 
-    # La extensión solo puede contener texto de nombre.
+    # --------------------------------------------------------
+    # EVITAR RUTAS EN LA EXTENSIÓN
+    # --------------------------------------------------------
+
     if "/" in extension or "\\" in extension:
         raise ValueError(
             "La extensión no puede contener rutas."
         )
 
+    # --------------------------------------------------------
+    # PEDIR NOMBRE
+    # --------------------------------------------------------
+
     nombre = input(
         f"Nombre del archivo de salida "
-        f"(sin necesidad de escribir {extension}): "
+        f"(sin necesidad de escribir {extension}):\n"
+        f"{GRAY}(Introduce 0 para volver al menú){RESET}\n"
+        f"> "
     ).strip()
+
+    # --------------------------------------------------------
+    # VOLVER AL MENÚ
+    # --------------------------------------------------------
+
+    if nombre == "0":
+        return None
+
+    # --------------------------------------------------------
+    # QUITAR COMILLAS
+    # --------------------------------------------------------
 
     if (
         len(nombre) >= 2
@@ -202,18 +323,31 @@ def pedir_nombre_archivo(extension):
     ):
         nombre = nombre[1:-1]
 
+    # --------------------------------------------------------
+    # COMPROBAR VACÍO
+    # --------------------------------------------------------
+
     if not nombre:
         raise ValueError(
             "El nombre del archivo no puede estar vacío."
         )
+
+    # --------------------------------------------------------
+    # EVITAR RUTAS
+    # --------------------------------------------------------
 
     if "/" in nombre or "\\" in nombre:
         raise ValueError(
             "Introduce solamente el nombre del archivo."
         )
 
-    # Si ya tiene la extensión, no la duplicamos.
-    if not nombre.lower().endswith(extension.lower()):
+    # --------------------------------------------------------
+    # AÑADIR EXTENSIÓN
+    # --------------------------------------------------------
+
+    if not nombre.lower().endswith(
+        extension.lower()
+    ):
         nombre += extension
 
     return nombre
@@ -223,10 +357,17 @@ def confirmar_sobrescritura(ruta):
     """Pregunta antes de sobrescribir un archivo existente."""
 
     if ruta.exists():
-        return pedir_si_no(
-            f"{YELLOW}El archivo '{ruta}' ya existe. "
-            f"¿Quieres sobrescribirlo?{RESET}"
+
+        respuesta = pedir_si_no(
+            f"{RED}"
+            f"El archivo '{ruta}' ya existe."
+            f"{RESET} "
+            f"{YELLOW}"
+            f"¿Quieres sobrescribirlo?"
+            f"{RESET}"
         )
+
+        return respuesta
 
     return True
 
@@ -269,14 +410,22 @@ def convertir_archivo_a_base64(ruta):
     visualizar el resultado directamente en la terminal.
     """
 
-    with open(ruta, "rb") as archivo:
+    with open(
+        ruta,
+        "rb"
+    ) as archivo:
 
         datos = archivo.read()
 
-    return base64.b64encode(datos).decode("ascii")
+    return base64.b64encode(
+        datos
+    ).decode("ascii")
 
 
-def guardar_archivo_como_base64(ruta_entrada, ruta_salida):
+def guardar_archivo_como_base64(
+    ruta_entrada,
+    ruta_salida
+):
     """
     Convierte un archivo a Base64 y lo guarda directamente
     en un archivo .txt.
@@ -289,19 +438,31 @@ def guardar_archivo_como_base64(ruta_entrada, ruta_salida):
 
     # CHUNK_SIZE debe ser múltiplo de 3 para que cada bloque
     # pueda convertirse independientemente a Base64.
-    tamaño_bloque = (CHUNK_SIZE // 3) * 3
+    tamaño_bloque = (
+        CHUNK_SIZE // 3
+    ) * 3
 
-    with open(ruta_entrada, "rb") as origen, \
-         open(ruta_salida, "w", encoding="ascii") as destino:
+    with open(
+        ruta_entrada,
+        "rb"
+    ) as origen, open(
+        ruta_salida,
+        "w",
+        encoding="ascii"
+    ) as destino:
 
         while True:
 
-            bloque = origen.read(tamaño_bloque)
+            bloque = origen.read(
+                tamaño_bloque
+            )
 
             if not bloque:
                 break
 
-            resultado = base64.b64encode(bloque).decode("ascii")
+            resultado = base64.b64encode(
+                bloque
+            ).decode("ascii")
 
             destino.write(resultado)
 
@@ -313,15 +474,23 @@ def guardar_archivo_como_base64(ruta_entrada, ruta_salida):
             )
 
 
-def mostrar_progreso(actual, total):
+def mostrar_progreso(
+    actual,
+    total
+):
     """Muestra una barra de progreso."""
 
     if total <= 0:
         porcentaje = 100
     else:
-        porcentaje = actual / total * 100
+        porcentaje = (
+            actual / total * 100
+        )
 
-    porcentaje = min(porcentaje, 100)
+    porcentaje = min(
+        porcentaje,
+        100
+    )
 
     ancho = 30
 
@@ -331,11 +500,14 @@ def mostrar_progreso(actual, total):
 
     barra = (
         "█" * completado
-        + "░" * (ancho - completado)
+        + "░" * (
+            ancho - completado
+        )
     )
 
     print(
-        f"\r[{barra}] {porcentaje:6.2f}%",
+        f"\r[{barra}] "
+        f"{porcentaje:6.2f}%",
         end="",
         flush=True
     )
@@ -346,15 +518,22 @@ def opcion_archivo_a_base64():
 
     limpiar_pantalla()
 
-    print(f"{CYAN}{BOLD}")
+    print(f"{GREEN}")
     print("==============================================")
     print("             ARCHIVO → BASE64")
     print("==============================================")
     print(RESET)
 
+    # --------------------------------------------------------
+    # PEDIR ARCHIVO
+    # --------------------------------------------------------
+
     ruta = pedir_ruta_archivo(
         "\nIntroduce la ruta del archivo: "
     )
+
+    if ruta is None:
+        return
 
     tamaño = ruta.stat().st_size
 
@@ -362,15 +541,24 @@ def opcion_archivo_a_base64():
     print(
         f"{GRAY}Archivo:{RESET} {ruta}"
     )
+
     print(
-        f"{GRAY}Tamaño:{RESET}  {mostrar_tamano(tamaño)}"
+        f"{GRAY}Tamaño:{RESET}  "
+        f"{mostrar_tamano(tamaño)}"
     )
+
+    # --------------------------------------------------------
+    # OPCIONES
+    # --------------------------------------------------------
 
     print()
     print("¿Qué quieres hacer?")
     print()
     print("1. Ver el Base64 en la terminal")
     print("2. Guardar directamente en un archivo .txt")
+    print(
+        f"{GRAY}0. Volver al menú principal{RESET}"
+    )
     print()
 
     while True:
@@ -379,35 +567,46 @@ def opcion_archivo_a_base64():
             "Selecciona una opción [1/2]: "
         ).strip()
 
-        if opcion in ("1", "2"):
+        if opcion == "0":
+            return
+
+        if opcion in (
+            "1",
+            "2"
+        ):
             break
 
         print(
-            f"{YELLOW}Opción no válida.{RESET}"
+            f"{RED}Opción no válida.{RESET}"
         )
 
-    # --------------------------------------------------------
+    # ========================================================
     # MOSTRAR EN TERMINAL
-    # --------------------------------------------------------
+    # ========================================================
 
     if opcion == "1":
 
         print()
+
         print(
             f"{BLUE}Generando Base64...{RESET}"
         )
 
         try:
 
-            resultado = convertir_archivo_a_base64(
-                ruta
+            resultado = (
+                convertir_archivo_a_base64(
+                    ruta
+                )
             )
 
         except MemoryError:
 
             print(
-                f"\n{RED}El archivo es demasiado grande "
-                f"para mostrarlo completo en memoria.{RESET}"
+                f"\n{RED}"
+                f"El archivo es demasiado grande "
+                f"para mostrarlo completo en memoria."
+                f"{RESET}"
             )
 
             pausa()
@@ -415,37 +614,71 @@ def opcion_archivo_a_base64():
 
         print()
         print()
+
         print(
-            f"{CYAN}========== BASE64 =========={RESET}"
+            f"{GREEN}"
+            f"========== BASE64 =========="
+            f"{RESET}"
         )
+
         print()
 
         print(resultado)
 
         print()
+
         print(
-            f"{CYAN}============================{RESET}"
+            f"{GREEN}"
+            f"============================"
+            f"{RESET}"
         )
 
-        # Después de mostrarlo, preguntamos si quiere guardarlo.
         print()
 
-        if pedir_si_no(
-            "¿Quieres guardar este Base64 en un archivo .txt?"
-        ):
+        # ----------------------------------------------------
+        # PREGUNTAR SI QUIERE GUARDAR
+        # ----------------------------------------------------
+
+        respuesta = pedir_si_no(
+            f"{YELLOW}"
+            f"¿Quieres guardar este Base64 "
+            f"en un archivo .txt?"
+            f"{RESET}"
+        )
+
+        if respuesta is None:
+            return
+
+        if respuesta:
 
             nombre = pedir_nombre_txt()
 
-            ruta_salida = ruta.parent / nombre
+            if nombre is None:
+                return
+
+            ruta_salida = (
+                ruta.parent / nombre
+            )
 
             if ruta_salida.exists():
 
-                if not confirmar_sobrescritura(
-                    ruta_salida
-                ):
-                    print(
-                        f"{YELLOW}No se ha guardado el archivo.{RESET}"
+                respuesta = (
+                    confirmar_sobrescritura(
+                        ruta_salida
                     )
+                )
+
+                if respuesta is None:
+                    return
+
+                if not respuesta:
+
+                    print(
+                        f"{RED}"
+                        f"No se ha guardado el archivo."
+                        f"{RESET}"
+                    )
+
                     pausa()
                     return
 
@@ -457,23 +690,29 @@ def opcion_archivo_a_base64():
                     encoding="ascii"
                 ) as archivo:
 
-                    archivo.write(resultado)
+                    archivo.write(
+                        resultado
+                    )
 
                 print(
-                    f"\n{GREEN}✓ Archivo guardado correctamente:{RESET}"
+                    f"\n{GREEN}"
+                    f"✓ Archivo guardado correctamente:"
+                    f"{RESET}"
                 )
+
                 print(ruta_salida)
 
             except Exception as error:
 
                 print(
-                    f"\n{RED}Error al guardar:{RESET} "
-                    f"{error}"
+                    f"\n{RED}"
+                    f"Error al guardar:"
+                    f"{RESET} {error}"
                 )
 
-    # --------------------------------------------------------
+    # ========================================================
     # GUARDAR DIRECTAMENTE
-    # --------------------------------------------------------
+    # ========================================================
 
     elif opcion == "2":
 
@@ -481,20 +720,37 @@ def opcion_archivo_a_base64():
 
         nombre = pedir_nombre_txt()
 
-        ruta_salida = ruta.parent / nombre
+        if nombre is None:
+            return
+
+        ruta_salida = (
+            ruta.parent / nombre
+        )
 
         if ruta_salida.exists():
 
-            if not confirmar_sobrescritura(
-                ruta_salida
-            ):
-                print(
-                    f"{YELLOW}Operación cancelada.{RESET}"
+            respuesta = (
+                confirmar_sobrescritura(
+                    ruta_salida
                 )
+            )
+
+            if respuesta is None:
+                return
+
+            if not respuesta:
+
+                print(
+                    f"{YELLOW}"
+                    f"Operación cancelada."
+                    f"{RESET}"
+                )
+
                 pausa()
                 return
 
         print()
+
         print(
             f"{BLUE}Convirtiendo...{RESET}"
         )
@@ -508,16 +764,22 @@ def opcion_archivo_a_base64():
 
             print()
             print()
+
             print(
-                f"{GREEN}✓ Base64 guardado correctamente:{RESET}"
+                f"{GREEN}"
+                f"✓ Base64 guardado correctamente:"
+                f"{RESET}"
             )
+
             print(ruta_salida)
 
         except Exception as error:
 
             print()
             print(
-                f"{RED}Error:{RESET} {error}"
+                f"{RED}"
+                f"Error:"
+                f"{RESET} {error}"
             )
 
     pausa()
@@ -538,15 +800,16 @@ def limpiar_base64(texto):
         - textos formateados
     """
 
-    return "".join(texto.split())
+    return "".join(
+        texto.split()
+    )
 
 
 def validar_base64(texto):
-    """
-    Comprueba que el contenido sea Base64 válido.
-    """
+    """Comprueba que el contenido sea Base64 válido."""
 
     if not texto:
+
         raise ValueError(
             "El contenido Base64 está vacío."
         )
@@ -558,22 +821,32 @@ def validar_base64(texto):
             validate=True
         )
 
-    except (binascii.Error, ValueError):
+    except (
+        binascii.Error,
+        ValueError
+    ):
 
         raise ValueError(
-            "El texto introducido no es un Base64 válido."
+            "El texto introducido "
+            "no es un Base64 válido."
         )
 
 
-def pedir_datos_base64_desde_txt():
+def pedir_datos_base64_desde_txt() -> str | None:
     """
     Solicita la ruta de un archivo .txt y devuelve
     su contenido Base64.
+
+    Introducir 0 permite volver al menú.
     """
 
     ruta = pedir_ruta_archivo(
-        "\nIntroduce la ruta del archivo .txt con Base64: "
+        "\nIntroduce la ruta del archivo .txt "
+        "con Base64: "
     )
+
+    if ruta is None:
+        return None
 
     try:
 
@@ -588,31 +861,54 @@ def pedir_datos_base64_desde_txt():
     except UnicodeDecodeError:
 
         raise ValueError(
-            "El archivo no parece ser un archivo Base64 "
-            "de texto válido."
+            "El archivo no parece ser un archivo "
+            "Base64 de texto válido."
         )
 
-    return limpiar_base64(contenido)
+    return limpiar_base64(
+        contenido
+    )
 
 
-def pedir_datos_base64_manual():
+def pedir_datos_base64_manual() -> str | None:
     """
     Permite introducir Base64 directamente.
 
     Se pueden pegar varias líneas.
+
     Una línea vacía finaliza la entrada.
+
+    Introducir 0 como primera línea permite
+    volver al menú.
     """
 
     print()
+
     print(
-        f"{CYAN}Introduce el Base64.{RESET}"
+        f"{CYAN}"
+        f"Introduce el Base64."
+        f"{RESET}"
     )
+
     print(
-        f"{GRAY}Puedes pegarlo en una o varias líneas.{RESET}"
+        f"{GRAY}"
+        f"Puedes pegarlo en una o varias líneas."
+        f"{RESET}"
     )
+
     print(
-        f"{GRAY}Cuando termines, pulsa ENTER en una línea vacía.{RESET}"
+        f"{GRAY}"
+        f"Cuando termines, pulsa ENTER "
+        f"en una línea vacía."
+        f"{RESET}"
     )
+
+    print(
+        f"{GRAY}"
+        f"Introduce 0 para volver al menú."
+        f"{RESET}"
+    )
+
     print()
 
     lineas = []
@@ -620,19 +916,39 @@ def pedir_datos_base64_manual():
     while True:
 
         try:
+
             linea = input()
 
         except EOFError:
+
             break
+
+        # ----------------------------------------------------
+        # LÍNEA VACÍA = TERMINAR
+        # ----------------------------------------------------
 
         if linea == "":
             break
 
+        # ----------------------------------------------------
+        # 0 COMO PRIMERA LÍNEA = VOLVER
+        # ----------------------------------------------------
+
+        if (
+            not lineas
+            and linea.strip() == "0"
+        ):
+            return None
+
         lineas.append(linea)
 
-    contenido = "".join(lineas)
+    contenido = "".join(
+        lineas
+    )
 
-    return limpiar_base64(contenido)
+    return limpiar_base64(
+        contenido
+    )
 
 
 def decodificar_base64_en_memoria(
@@ -651,13 +967,20 @@ def decodificar_base64_en_memoria(
             validate=True
         )
 
-    except (binascii.Error, ValueError):
+    except (
+        binascii.Error,
+        ValueError
+    ):
 
         raise ValueError(
-            "El contenido introducido no es Base64 válido."
+            "El contenido introducido "
+            "no es Base64 válido."
         )
 
-    with open(ruta_salida, "wb") as archivo:
+    with open(
+        ruta_salida,
+        "wb"
+    ) as archivo:
 
         archivo.write(datos)
 
@@ -675,7 +998,10 @@ def decodificar_txt_base64(
 
     pendiente = b""
 
-    tamaño_total = ruta_entrada.stat().st_size
+    tamaño_total = (
+        ruta_entrada.stat().st_size
+    )
+
     procesados = 0
 
     with open(
@@ -695,70 +1021,105 @@ def decodificar_txt_base64(
             if not bloque:
                 break
 
-            procesados += len(bloque)
+            procesados += len(
+                bloque
+            )
 
-            # Eliminar espacios y saltos de línea.
+            # ------------------------------------------------
+            # ELIMINAR ESPACIOS Y SALTOS
+            # ------------------------------------------------
+
             bloque = b"".join(
                 bloque.split()
             )
 
             if not bloque:
+
                 mostrar_progreso(
                     procesados,
                     tamaño_total
                 )
+
                 continue
 
-            bloque = pendiente + bloque
+            bloque = (
+                pendiente + bloque
+            )
 
-            # Base64 funciona en grupos de 4 caracteres.
+            # ------------------------------------------------
+            # BASE64 FUNCIONA EN GRUPOS DE 4
+            # ------------------------------------------------
+
             cantidad = (
                 len(bloque) // 4
             ) * 4
 
-            parte = bloque[:cantidad]
+            parte = (
+                bloque[:cantidad]
+            )
 
-            pendiente = bloque[cantidad:]
+            pendiente = (
+                bloque[cantidad:]
+            )
 
             if parte:
 
                 try:
 
-                    datos = base64.b64decode(
-                        parte,
-                        validate=True
+                    datos = (
+                        base64.b64decode(
+                            parte,
+                            validate=True
+                        )
                     )
 
-                except (binascii.Error, ValueError):
+                except (
+                    binascii.Error,
+                    ValueError
+                ):
 
                     raise ValueError(
-                        "El archivo contiene Base64 inválido."
+                        "El archivo contiene "
+                        "Base64 inválido."
                     )
 
-                destino.write(datos)
+                destino.write(
+                    datos
+                )
 
             mostrar_progreso(
                 procesados,
                 tamaño_total
             )
 
-        # Procesar el último fragmento.
+        # ----------------------------------------------------
+        # PROCESAR ÚLTIMO FRAGMENTO
+        # ----------------------------------------------------
+
         if pendiente:
 
             try:
 
-                datos = base64.b64decode(
-                    pendiente,
-                    validate=True
+                datos = (
+                    base64.b64decode(
+                        pendiente,
+                        validate=True
+                    )
                 )
 
-            except (binascii.Error, ValueError):
+            except (
+                binascii.Error,
+                ValueError
+            ):
 
                 raise ValueError(
-                    "El Base64 está incompleto o es inválido."
+                    "El Base64 está incompleto "
+                    "o es inválido."
                 )
 
-            destino.write(datos)
+            destino.write(
+                datos
+            )
 
 
 def opcion_base64_a_archivo():
@@ -766,16 +1127,23 @@ def opcion_base64_a_archivo():
 
     limpiar_pantalla()
 
-    print(f"{CYAN}{BOLD}")
+    print(f"{GREEN}")
     print("==============================================")
     print("             BASE64 → ARCHIVO")
     print("==============================================")
     print(RESET)
 
+    # --------------------------------------------------------
+    # ORIGEN DEL BASE64
+    # --------------------------------------------------------
+
     print("¿Dónde está el Base64?")
     print()
     print("1. En un archivo .txt")
     print("2. Quiero introducirlo directamente")
+    print(
+        f"{GRAY}0. Volver al menú principal{RESET}"
+    )
     print()
 
     while True:
@@ -784,55 +1152,111 @@ def opcion_base64_a_archivo():
             "Selecciona una opción [1/2]: "
         ).strip()
 
-        if opcion in ("1", "2"):
+        if opcion == "0":
+            return
+
+        if opcion in (
+            "1",
+            "2"
+        ):
             break
 
         print(
-            f"{YELLOW}Opción no válida.{RESET}"
+            f"{RED}Opción no válida.{RESET}"
         )
 
-    # --------------------------------------------------------
+    # ========================================================
     # BASE64 DESDE TXT
-    # --------------------------------------------------------
+    # ========================================================
 
     if opcion == "1":
 
         try:
 
-            ruta_base64 = pedir_ruta_archivo(
-                "\nIntroduce la ruta del archivo .txt: "
+            ruta_base64 = (
+                pedir_ruta_archivo(
+                    "\nIntroduce la ruta "
+                    "del archivo .txt: "
+                )
             )
 
+            if ruta_base64 is None:
+                return
+
+            # ------------------------------------------------
+            # EXTENSIÓN
+            # ------------------------------------------------
+
             extension = input(
-                "\n¿Qué extensión tendrá el archivo recuperado? "
-                "(ejemplo: pdf, png, zip): "
+                "\n¿Qué extensión tendrá "
+                "el archivo recuperado? "
+                "(ejemplo: pdf, png, zip):\n"
+                f"{GRAY}"
+                "(Introduce 0 para volver al menú)"
+                f"{RESET}\n"
+                "> "
             ).strip()
 
+            if extension == "0":
+                return
+
             if not extension:
+
                 raise ValueError(
                     "La extensión no puede estar vacía."
                 )
+
+            # ------------------------------------------------
+            # NOMBRE
+            # ------------------------------------------------
 
             nombre = pedir_nombre_archivo(
                 extension
             )
 
-            ruta_salida = ruta_base64.parent / nombre
+            if nombre is None:
+                return
+
+            ruta_salida = (
+                ruta_base64.parent / nombre
+            )
+
+            # ------------------------------------------------
+            # SOBRESCRITURA
+            # ------------------------------------------------
 
             if ruta_salida.exists():
 
-                if not confirmar_sobrescritura(
-                    ruta_salida
-                ):
-                    print(
-                        f"{YELLOW}Operación cancelada.{RESET}"
+                respuesta = (
+                    confirmar_sobrescritura(
+                        ruta_salida
                     )
+                )
+
+                if respuesta is None:
+                    return
+
+                if not respuesta:
+
+                    print(
+                        f"{YELLOW}"
+                        f"Operación cancelada."
+                        f"{RESET}"
+                    )
+
                     pausa()
                     return
 
+            # ------------------------------------------------
+            # DECODIFICAR
+            # ------------------------------------------------
+
             print()
+
             print(
-                f"{BLUE}Decodificando...{RESET}"
+                f"{BLUE}"
+                f"Decodificando..."
+                f"{RESET}"
             )
 
             decodificar_txt_base64(
@@ -842,64 +1266,131 @@ def opcion_base64_a_archivo():
 
             print()
             print()
+
             print(
-                f"{GREEN}✓ Archivo recuperado correctamente:{RESET}"
+                f"{GREEN}"
+                f"✓ Archivo recuperado correctamente:"
+                f"{RESET}"
             )
+
             print(ruta_salida)
 
         except Exception as error:
 
             print()
             print(
-                f"{RED}Error:{RESET} {error}"
+                f"{RED}"
+                f"Error:"
+                f"{RESET} {error}"
             )
 
-    # --------------------------------------------------------
+    # ========================================================
     # BASE64 INTRODUCIDO MANUALMENTE
-    # --------------------------------------------------------
+    # ========================================================
 
     elif opcion == "2":
 
         try:
 
-            contenido = pedir_datos_base64_manual()
+            # ------------------------------------------------
+            # OBTENER BASE64
+            # ------------------------------------------------
 
-            validar_base64(contenido)
+            contenido = (
+                pedir_datos_base64_manual()
+            )
+
+            if contenido is None:
+                return
+
+            # ------------------------------------------------
+            # VALIDAR BASE64
+            # ------------------------------------------------
+
+            validar_base64(
+                contenido
+            )
 
             print()
 
+            # ------------------------------------------------
+            # EXTENSIÓN
+            # ------------------------------------------------
+
             extension = input(
-                "¿Qué extensión tendrá el archivo recuperado? "
-                "(ejemplo: pdf, png, zip): "
+                "¿Qué extensión tendrá "
+                "el archivo recuperado? "
+                "(ejemplo: pdf, png, zip):\n"
+                f"{GRAY}"
+                "(Introduce 0 para volver al menú)"
+                f"{RESET}\n"
+                "> "
             ).strip()
 
+            if extension == "0":
+                return
+
             if not extension:
+
                 raise ValueError(
                     "La extensión no puede estar vacía."
                 )
+
+            # ------------------------------------------------
+            # NOMBRE
+            # ------------------------------------------------
 
             nombre = pedir_nombre_archivo(
                 extension
             )
 
-            # Como no tenemos un directorio de entrada,
-            # guardamos en el directorio actual.
-            ruta_salida = Path.cwd() / nombre
+            if nombre is None:
+                return
+
+            # ------------------------------------------------
+            # DIRECTORIO DE SALIDA
+            # ------------------------------------------------
+
+            ruta_salida = (
+                Path.cwd() / nombre
+            )
+
+            # ------------------------------------------------
+            # SOBRESCRITURA
+            # ------------------------------------------------
 
             if ruta_salida.exists():
 
-                if not confirmar_sobrescritura(
-                    ruta_salida
-                ):
-                    print(
-                        f"{YELLOW}Operación cancelada.{RESET}"
+                respuesta = (
+                    confirmar_sobrescritura(
+                        ruta_salida
                     )
+                )
+
+                if respuesta is None:
+                    return
+
+                if not respuesta:
+
+                    print(
+                        f"{YELLOW}"
+                        f"Operación cancelada."
+                        f"{RESET}"
+                    )
+
                     pausa()
                     return
 
+            # ------------------------------------------------
+            # DECODIFICAR
+            # ------------------------------------------------
+
             print()
+
             print(
-                f"{BLUE}Decodificando...{RESET}"
+                f"{BLUE}"
+                f"Decodificando..."
+                f"{RESET}"
             )
 
             decodificar_base64_en_memoria(
@@ -908,16 +1399,22 @@ def opcion_base64_a_archivo():
             )
 
             print()
+
             print(
-                f"{GREEN}✓ Archivo recuperado correctamente:{RESET}"
+                f"{GREEN}"
+                f"✓ Archivo recuperado correctamente:"
+                f"{RESET}"
             )
+
             print(ruta_salida)
 
         except Exception as error:
 
             print()
             print(
-                f"{RED}Error:{RESET} {error}"
+                f"{RED}"
+                f"Error:"
+                f"{RESET} {error}"
             )
 
     pausa()
@@ -928,10 +1425,11 @@ def opcion_base64_a_archivo():
 # ============================================================
 
 def mostrar_menu():
+    """Muestra el menú principal."""
 
     limpiar_pantalla()
 
-    print(f"{CYAN}{BOLD}")
+    print(f"{WHITE}")
     print("==============================================")
     print("                BASE64CONVERTER")
     print("==============================================")
@@ -943,13 +1441,24 @@ def mostrar_menu():
     )
 
     print()
-    print(f"{BOLD}1.{RESET} Archivo → Base64")
-    print(f"{BOLD}2.{RESET} Base64 → Archivo")
-    print(f"{BOLD}3.{RESET} Salir")
+
+    print(
+        f"{BOLD}1.{RESET} Archivo → Base64"
+    )
+
+    print(
+        f"{BOLD}2.{RESET} Base64 → Archivo"
+    )
+
+    print(
+        f"{BOLD}3.{RESET} Salir"
+    )
+
     print()
 
 
 def main():
+    """Función principal del programa."""
 
     while True:
 
@@ -959,29 +1468,50 @@ def main():
             "Selecciona una opción: "
         ).strip()
 
+        # ----------------------------------------------------
+        # ARCHIVO → BASE64
+        # ----------------------------------------------------
+
         if opcion == "1":
 
             opcion_archivo_a_base64()
 
+        # ----------------------------------------------------
+        # BASE64 → ARCHIVO
+        # ----------------------------------------------------
+
         elif opcion == "2":
 
             opcion_base64_a_archivo()
+
+        # ----------------------------------------------------
+        # SALIR
+        # ----------------------------------------------------
 
         elif opcion == "3":
 
             limpiar_pantalla()
 
             print(
-                f"{GREEN}Hasta luego.{RESET}"
+                f"{GREEN}"
+                f"Hasta luego."
+                f"{RESET}"
             )
 
             break
 
+        # ----------------------------------------------------
+        # OPCIÓN NO VÁLIDA
+        # ----------------------------------------------------
+
         else:
 
             print()
+
             print(
-                f"{YELLOW}Opción no válida.{RESET}"
+                f"{RED}"
+                f"Opción no válida."
+                f"{RESET}"
             )
 
             pausa()
@@ -1001,8 +1531,11 @@ if __name__ == "__main__":
 
         print()
         print()
+
         print(
-            f"{YELLOW}Programa cancelado por el usuario.{RESET}"
+            f"{YELLOW}"
+            f"Programa cancelado por el usuario."
+            f"{RESET}"
         )
 
         sys.exit(0)
