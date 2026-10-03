@@ -121,17 +121,16 @@ Uso
 
 Al ejecutar el programa aparecerá el menú principal:
 
-==============================================
                 BASE64CONVERTER
-==============================================
 
 Conversor de archivos a/desde Base64.
 
 1. Archivo → Base64
+   
 2. Base64 → Archivo
+   
 3. Salir
 
-1. Archivo → Base64
 
 Selecciona:
 
@@ -148,6 +147,7 @@ Introduce la ruta del archivo: /ruta/al/archivo.pdf
 Después podrás elegir:
 
 1. Ver el Base64 en la terminal
+
 2. Guardar directamente en un archivo .txt
 
 
@@ -156,6 +156,7 @@ Si eliges guardar, el archivo .txt se crea en el mismo directorio que el archivo
 Por ejemplo:
 
 archivo.pdf
+
 archivo_base64.txt
 
 
@@ -178,6 +179,7 @@ Selecciona:
 El programa permite utilizar dos métodos:
 
 1. En un archivo .txt
+   
 2. Introducir el Base64 directamente
 
 Desde un archivo .txt
