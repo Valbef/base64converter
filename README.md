@@ -54,12 +54,18 @@ Instalación:
 
 Windows
 
+opcion1:
+
+Descarga el archivo Base64converter.exe
+
+opcion2:
+
 Descarga o copia el proyecto en una carpeta.
 
 
 Abre una terminal en esa carpeta y ejecuta:
 
-python main.py
+python base64converter.py
 
 -------------------------------------------------------
 
